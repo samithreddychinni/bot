@@ -82,17 +82,37 @@ client.on('qr', async (qr) => {
     }
 });
 
-client.on('ready', async () => {
-    console.log('Client is ready!');
+client.on('authenticated', () => {
+    console.log('Client is authenticated!');
+    // Update status immediately for a responsive UI after scanning
     whatsAppStatus = 'connected';
     qrDataURL = null;
+});
+
+client.on('auth_failure', msg => {
+    console.error('AUTHENTICATION FAILURE', msg);
+    whatsAppStatus = 'disconnected';
+});
+
+client.on('ready', async () => {
+    console.log('Client is ready!');
+    whatsAppStatus = 'connected'; // Redundant but safe
     
+    console.log("Attempting to connect to vector database with robust method...");
+    // Robustly get or create the collection
     try {
-        memoryCollection = await chromaClient.getOrCreateCollection({ name: "memory" });
-        console.log("Memory vector collection is ready.");
+        memoryCollection = await chromaClient.getCollection({ name: "memory" });
+        console.log("Successfully loaded existing memory collection.");
     } catch (error) {
-        console.error("Fatal error: Could not get or create memory collection.", error);
-        if (!IS_RENDER_ENV) process.exit(1);
+        console.warn("Could not get existing collection, attempting to create a new one.");
+        try {
+            memoryCollection = await chromaClient.createCollection({ name: "memory" });
+            console.log("Successfully created new memory collection.");
+        } catch (createError) {
+             console.error("Fatal error: Could not get or create memory collection.", createError);
+             // On Render, we don't want to crash the whole app, just log the error.
+             if (!IS_RENDER_ENV) process.exit(1);
+        }
     }
     
     console.log(`Assistant is running on number: ${client.info.wid._serialized}`);
@@ -300,7 +320,7 @@ async function sendDailyDigest(recipientId) {
     const fullPrompt = `${digestPrompt}\n\nHere is a past memory to include: "${answer}"`;
 
     const response = await ai.models.generateContent({
-        model: 'gem-2.5-flash',
+        model: 'gemini-2.5-flash',
         contents: fullPrompt,
     });
 
