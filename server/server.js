@@ -253,12 +253,16 @@ async function saveToMemory(text) {
         return;
     }
     const docId = `doc_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-    await memoryCollection.add({
-        ids: [docId],
-        documents: [text],
-        metadatas: [{ source: "whatsapp", timestamp: new Date().toISOString() }],
-    });
-    console.log(`Saved to memory (ID: ${docId}): "${text}"`);
+    try {
+        await memoryCollection.add({
+            ids: [docId],
+            documents: [text],
+            metadatas: [{ source: "whatsapp", timestamp: new Date().toISOString() }],
+        });
+        console.log(`Saved to memory (ID: ${docId}): "${text}"`);
+    } catch (error) {
+        console.error("CRITICAL: Failed to save to ChromaDB. This is likely a library bug.", error);
+    }
 }
 
 async function answerQuestion(question) {
@@ -266,10 +270,17 @@ async function answerQuestion(question) {
         console.error("Memory collection is not initialized. Cannot answer question from memory.");
         return getGenericChatResponse(`Answer this question: ${question}`);
     }
-    const results = await memoryCollection.query({
-        nResults: 3,
-        queryTexts: [question],
-    });
+
+    let results;
+    try {
+        results = await memoryCollection.query({
+            nResults: 3,
+            queryTexts: [question],
+        });
+    } catch (error) {
+        console.error("CRITICAL: ChromaDB query failed. This is a library bug. Falling back to generic response.", error);
+        return getGenericChatResponse(`Answer this question: ${question}`);
+    }
 
     if (!results || !results.documents || !results.documents[0] || results.documents[0].length === 0) {
         console.log("No relevant memories found for the question.");
