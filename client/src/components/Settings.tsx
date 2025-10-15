@@ -30,29 +30,39 @@ export const Settings: React.FC = () => {
     const [notifications, setNotifications] = useState(true);
     const [whatsAppStatus, setWhatsAppStatus] = useState<'initializing' | 'unscanned' | 'connected' | 'disconnected'>('initializing');
     const [qrCode, setQrCode] = useState<string | null>(null);
+    const [operationMode, setOperationMode] = useState<'two-number' | 'single-number'>('two-number');
+
 
     useEffect(() => {
-        const fetchStatus = async () => {
+        const fetchStatusAndSettings = async () => {
             try {
-                // Use relative path for API calls
-                const response = await fetch('/api/whatsapp/status');
-                if (response.ok) {
-                    const data = await response.json();
+                // Fetch WhatsApp status
+                const statusResponse = await fetch('/api/whatsapp/status');
+                if (statusResponse.ok) {
+                    const data = await statusResponse.json();
                     setWhatsAppStatus(data.status);
                     setQrCode(data.qr);
                 } else {
                     setWhatsAppStatus('disconnected');
                     setQrCode(null);
                 }
+
+                // Fetch current mode setting
+                const settingsResponse = await fetch('/api/settings');
+                if (settingsResponse.ok) {
+                    const settingsData = await settingsResponse.json();
+                    setOperationMode(settingsData.mode);
+                }
+
             } catch (error) {
-                console.error("Failed to fetch WhatsApp status:", error);
+                console.error("Failed to fetch status or settings:", error);
                 setWhatsAppStatus('disconnected');
                 setQrCode(null);
             }
         };
 
-        fetchStatus();
-        const intervalId = setInterval(fetchStatus, 3000);
+        fetchStatusAndSettings();
+        const intervalId = setInterval(fetchStatusAndSettings, 5000); 
 
         return () => clearInterval(intervalId);
     }, []);
@@ -73,6 +83,28 @@ export const Settings: React.FC = () => {
         }
     };
 
+    const handleModeToggle = async () => {
+        const newMode = operationMode === 'two-number' ? 'single-number' : 'two-number';
+        const originalMode = operationMode;
+        setOperationMode(newMode); // Optimistic update
+
+        try {
+            const response = await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: newMode })
+            });
+            if (!response.ok) {
+                setOperationMode(originalMode);
+                alert('Failed to switch mode. Please try again.');
+            }
+        } catch (error) {
+            console.error('Failed to switch mode:', error);
+            setOperationMode(originalMode);
+            alert('An error occurred while switching modes.');
+        }
+    };
+
     const renderWhatsAppButton = () => {
         switch (whatsAppStatus) {
             case 'initializing':
@@ -87,16 +119,20 @@ export const Settings: React.FC = () => {
     };
 
     const renderConnectionStatusText = () => {
-        switch (whatsAppStatus) {
-            case 'initializing':
-                return "Initializing connection...";
-            case 'unscanned':
-                return "Scan the QR code to connect.";
-            case 'connected':
-                return "Your assistant is connected and ready on WhatsApp.";
-             case 'disconnected':
-                return "Connection lost. Restart the backend to reconnect.";
-        }
+        const baseStatus = (() => {
+             switch (whatsAppStatus) {
+                case 'initializing': return "Initializing connection...";
+                case 'unscanned': return "Scan the QR code to connect your bot's WhatsApp account.";
+                case 'connected': return "Your assistant is connected and ready on WhatsApp.";
+                case 'disconnected': return "Connection lost. Restart the backend to reconnect.";
+            }
+        })();
+
+        const modeHint = operationMode === 'two-number' 
+            ? 'Interact from your authorized personal number.'
+            : 'Interact by messaging yourself on the connected account.';
+
+        return whatsAppStatus === 'connected' ? `${baseStatus} ${modeHint}` : baseStatus;
     };
 
     return (
@@ -130,6 +166,17 @@ export const Settings: React.FC = () => {
                 </SettingsRow>
                 
                 <h2 className="text-2xl font-semibold mt-8 mb-2 text-highlight">Integrations</h2>
+
+                <SettingsRow
+                    label="Operation Mode"
+                    description={operationMode === 'two-number' ? "Use a dedicated number for the bot." : "Use your personal number for everything."}
+                >
+                     <label className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" checked={operationMode === 'single-number'} onChange={handleModeToggle} className="sr-only peer" />
+                        <div className="w-11 h-6 bg-primary peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+                        <span className="ml-3 text-sm font-medium text-text-secondary">{operationMode === 'single-number' ? 'Single-Number' : 'Two-Number'}</span>
+                    </label>
+                </SettingsRow>
                 
                 {whatsAppStatus === 'unscanned' && (
                     <div className="my-6 p-6 bg-primary rounded-lg text-center">

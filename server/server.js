@@ -35,6 +35,7 @@ const BOT_PREFIXES = ['✅', '🧠', '🤖', '*Good Morning! ☀️*'];
 let whatsAppStatus = 'initializing';
 let qrDataURL = null;
 let AUTHORIZED_NUMBER_SERIALIZED = null;
+let currentMode = 'two-number'; // 'two-number' or 'single-number'
 
 // --- INITIALIZATION ---
 if (!GEMINI_API_KEY || !AUTHORIZED_NUMBER) {
@@ -116,15 +117,19 @@ client.on('ready', async () => {
     }
     
     console.log(`Assistant is running on number: ${client.info.wid._serialized}`);
+    console.log(`Initial operating mode: ${currentMode}`);
 
     cron.schedule('0 7 * * *', () => {
-        console.log('Running scheduled daily digest for authorized user...');
-        sendDailyDigest(AUTHORIZED_NUMBER_SERIALIZED);
+        const selfWid = client.info.wid._serialized;
+        const digestRecipient = currentMode === 'two-number' ? AUTHORIZED_NUMBER_SERIALIZED : selfWid;
+
+        console.log(`Running scheduled daily digest for ${digestRecipient}...`);
+        sendDailyDigest(digestRecipient);
     }, {
         scheduled: true,
         timezone: "Asia/Kolkata"
     });
-    console.log(`Daily digest scheduled for 7:00 AM IST to be sent to ${AUTHORIZED_NUMBER}.`);
+    console.log(`Daily digest scheduled for 7:00 AM IST.`);
 });
 
 client.on('disconnected', (reason) => {
@@ -136,14 +141,18 @@ client.on('disconnected', (reason) => {
 client.on('message', async (message) => {
     const chat = await message.getChat();
     if (chat.isGroup) return;
-    if (message.from !== AUTHORIZED_NUMBER_SERIALIZED) return;
+
+    const selfWid = client.info.wid._serialized;
+    const isAuthorized = (currentMode === 'two-number' && message.from === AUTHORIZED_NUMBER_SERIALIZED) || (currentMode === 'single-number' && message.from === selfWid);
+
+    if (!isAuthorized) return;
     if (!message.body || BOT_PREFIXES.some(prefix => message.body.startsWith(prefix))) return;
 
-    console.log(`Received authorized message: "${message.body}"`);
+    console.log(`Received authorized message in ${currentMode} mode: "${message.body}"`);
     const intent = await recognizeIntent(message.body);
     console.log(`Recognized intent: ${intent.type}`);
 
-    const recipientId = AUTHORIZED_NUMBER_SERIALIZED;
+    const recipientId = message.from;
     switch (intent.type) {
         case 'note':
             await saveToMemory(intent.content);
@@ -188,6 +197,22 @@ apiRouter.post('/whatsapp/disconnect', async (req, res) => {
         res.status(400).json({ message: 'Client is not connected.' });
     }
 });
+
+apiRouter.get('/settings', (req, res) => {
+    res.json({ mode: currentMode });
+});
+
+apiRouter.post('/settings', (req, res) => {
+    const { mode } = req.body;
+    if (mode === 'single-number' || mode === 'two-number') {
+        currentMode = mode;
+        console.log(`Operation mode switched to: ${currentMode}`);
+        res.status(200).json({ message: `Mode switched to ${currentMode}`, mode: currentMode });
+    } else {
+        res.status(400).json({ error: 'Invalid mode specified.' });
+    }
+});
+
 
 // --- SERVE FRONTEND ---
 app.use(express.static(clientDistPath));
