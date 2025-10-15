@@ -1,0 +1,57 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Second Brain</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'primary': '#1E1E2E',
+              'secondary': '#313244',
+              'accent': '#89B4FA',
+              'text-primary': '#CDD6F4',
+              'text-secondary': '#A6ADC8',
+              'highlight': '#FAB387',
+              'success': '#A6E3A1',
+              'danger': '#F38BA8',
+            },
+          },
+        },
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.25.0",
+    "dotenv/": "https://aistudiocdn.com/dotenv@^17.2.3/",
+    "node-cron": "https://aistudiocdn.com/node-cron@^4.2.1",
+    "chromadb": "https://aistudiocdn.com/chromadb@^3.0.17",
+    "whatsapp-web.js": "https://aistudiocdn.com/whatsapp-web.js@^1.34.1",
+    "qrcode-terminal": "https://aistudiocdn.com/qrcode-terminal@^0.12.0",
+    "url": "https://aistudiocdn.com/url@^0.11.4",
+    "path": "https://aistudiocdn.com/path@^0.12.7",
+    "cors": "https://aistudiocdn.com/cors@^2.8.5",
+    "express": "https://aistudiocdn.com/express@^5.1.0",
+    "qrcode": "https://aistudiocdn.com/qrcode@^1.5.4",
+    "vite": "https://aistudiocdn.com/vite@^7.1.10",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.0.4",
+    "dotenv": "https://aistudiocdn.com/dotenv@^17.2.3"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-primary text-text-primary">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
