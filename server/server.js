@@ -7,6 +7,7 @@ const { Client, LocalAuth } = pkg;
 import cron from 'node-cron';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
@@ -36,6 +37,24 @@ const AUTH_DATA_PATH = IS_RENDER_ENV
     ? path.join(RENDER_DATA_DIR, "session_data")
     : path.join(projectRoot, 'session_data');
 
+// Ensure data directories exist on Render before anything tries to use them
+if (IS_RENDER_ENV) {
+    console.log("INFO: Running in Render environment. Ensuring data directories exist.");
+    try {
+        if (!fs.existsSync(CHROMA_DB_PATH)) {
+            fs.mkdirSync(CHROMA_DB_PATH, { recursive: true });
+            console.log(`Created ChromaDB directory at: ${CHROMA_DB_PATH}`);
+        }
+        if (!fs.existsSync(AUTH_DATA_PATH)) {
+            fs.mkdirSync(AUTH_DATA_PATH, { recursive: true });
+            console.log(`Created Auth data directory at: ${AUTH_DATA_PATH}`);
+        }
+        console.log("Data directories checked/created successfully.");
+    } catch (err) {
+        console.error("CRITICAL: Failed to create persistent data directories on Render.", err);
+    }
+}
+
 
 const BOT_PREFIXES = ['✅', '🧠', '🤖', '*Good Morning! ☀️*'];
 
@@ -58,7 +77,7 @@ const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 const chromaClient = new ChromaClient({ path: CHROMA_DB_PATH });
 
 if (IS_RENDER_ENV) {
-    console.log("INFO: Running in Render environment. Data will be stored in persistent disk.");
+    console.log("INFO: Data will be stored in persistent disk.");
     console.log(`Auth data path: ${AUTH_DATA_PATH}`);
     console.log(`ChromaDB path: ${CHROMA_DB_PATH}`);
     console.log("CRITICAL: Ensure you have a Persistent Disk mounted at /var/data in your Render settings.");
