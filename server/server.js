@@ -30,11 +30,12 @@ const clientDistPath = path.join(projectRoot, 'client', 'dist');
 const RENDER_DATA_DIR = '/var/data';
 
 // Use persistent disk on Render, otherwise use local folders
+// On Render, we write directly to the root of the disk to avoid permission issues with subdirectories.
 const CHROMA_DB_PATH = IS_RENDER_ENV 
-    ? path.join(RENDER_DATA_DIR, "chroma_data") 
+    ? RENDER_DATA_DIR
     : path.join(projectRoot, "chroma_data");
 const AUTH_DATA_PATH = IS_RENDER_ENV 
-    ? path.join(RENDER_DATA_DIR, "session_data")
+    ? RENDER_DATA_DIR
     : path.join(projectRoot, 'session_data');
 
 const BOT_PREFIXES = ['✅', '🧠', '🤖', '*Good Morning! ☀️*'];
@@ -58,10 +59,9 @@ const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 const chromaClient = new ChromaClient({ path: CHROMA_DB_PATH });
 
 if (IS_RENDER_ENV) {
-    console.log("INFO: Data will be stored in persistent disk.");
-    console.log(`Auth data path: ${AUTH_DATA_PATH}`);
-    console.log(`ChromaDB path: ${CHROMA_DB_PATH}`);
-    console.log("CRITICAL: Ensure you have a Persistent Disk mounted at /var/data in your Render settings.");
+    console.log("INFO: Running in Render environment. Data will be stored in persistent disk.");
+    console.log(`- Session & DB Path: ${RENDER_DATA_DIR}`);
+    console.log("-> IMPORTANT: Ensure you have a Persistent Disk mounted at /var/data in your Render service settings.");
 }
 
 
@@ -110,13 +110,12 @@ client.on('ready', async () => {
     console.log('Client is ready!');
     whatsAppStatus = 'connected'; // Redundant but safe
     
-    console.log("Attempting to connect to vector database...");
+    console.log("Attempting to connect to vector database with robust method...");
     try {
         memoryCollection = await chromaClient.getOrCreateCollection({ name: "memory" });
-        console.log("Successfully connected to memory collection.");
+        console.log("Successfully loaded existing memory collection.");
     } catch (error) {
          console.error("Fatal error: Could not get or create memory collection.", error);
-         // On Render, we don't want to crash the whole app, just log the error.
          if (!IS_RENDER_ENV) process.exit(1);
     }
     
