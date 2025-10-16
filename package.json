@@ -9,7 +9,7 @@
     "install:client": "cd client && npm install",
     "install": "npm-run-all install:*",
     "build": "cd client && npm run build",
-    "start": "node server/server.js",
+    "start": "if [ -d /var/data ]; then mkdir -p /var/data/session_data /var/data/chroma_data; fi && node server/server.js",
     "dev": "npm-run-all --parallel dev:*"
   },
   "dependencies": {

@@ -37,25 +37,6 @@ const AUTH_DATA_PATH = IS_RENDER_ENV
     ? path.join(RENDER_DATA_DIR, "session_data")
     : path.join(projectRoot, 'session_data');
 
-// Ensure data directories exist on Render before anything tries to use them
-if (IS_RENDER_ENV) {
-    console.log("INFO: Running in Render environment. Ensuring data directories exist.");
-    try {
-        if (!fs.existsSync(CHROMA_DB_PATH)) {
-            fs.mkdirSync(CHROMA_DB_PATH, { recursive: true });
-            console.log(`Created ChromaDB directory at: ${CHROMA_DB_PATH}`);
-        }
-        if (!fs.existsSync(AUTH_DATA_PATH)) {
-            fs.mkdirSync(AUTH_DATA_PATH, { recursive: true });
-            console.log(`Created Auth data directory at: ${AUTH_DATA_PATH}`);
-        }
-        console.log("Data directories checked/created successfully.");
-    } catch (err) {
-        console.error("CRITICAL: Failed to create persistent data directories on Render.", err);
-    }
-}
-
-
 const BOT_PREFIXES = ['✅', '🧠', '🤖', '*Good Morning! ☀️*'];
 
 // --- STATE MANAGEMENT ---
