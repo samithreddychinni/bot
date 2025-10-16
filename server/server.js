@@ -26,8 +26,16 @@ const IS_RENDER_ENV = !!process.env.RENDER;
 // --- PATHS CONFIGURATION ---
 const projectRoot = path.join(__dirname, '..'); 
 const clientDistPath = path.join(projectRoot, 'client', 'dist');
-const CHROMA_DB_PATH = IS_RENDER_ENV ? undefined : path.join(projectRoot, "chroma_data");
-const AUTH_DATA_PATH = IS_RENDER_ENV ? undefined : path.join(projectRoot, 'session_data');
+const RENDER_DATA_DIR = '/var/data';
+
+// Use persistent disk on Render, otherwise use local folders
+const CHROMA_DB_PATH = IS_RENDER_ENV 
+    ? path.join(RENDER_DATA_DIR, "chroma_data") 
+    : path.join(projectRoot, "chroma_data");
+const AUTH_DATA_PATH = IS_RENDER_ENV 
+    ? path.join(RENDER_DATA_DIR, "session_data")
+    : path.join(projectRoot, 'session_data');
+
 
 const BOT_PREFIXES = ['✅', '🧠', '🤖', '*Good Morning! ☀️*'];
 
@@ -47,12 +55,15 @@ if (!GEMINI_API_KEY || !AUTHORIZED_NUMBER) {
 }
 
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-const chromaClient = IS_RENDER_ENV ? new ChromaClient() : new ChromaClient({ path: CHROMA_DB_PATH });
+const chromaClient = new ChromaClient({ path: CHROMA_DB_PATH });
 
 if (IS_RENDER_ENV) {
-    console.warn("WARNING: Running in Render environment without a persistent disk.");
-    console.warn("ChromaDB and WhatsApp session data will be ephemeral. Use UptimeRobot to keep the service alive.");
+    console.log("INFO: Running in Render environment. Data will be stored in persistent disk.");
+    console.log(`Auth data path: ${AUTH_DATA_PATH}`);
+    console.log(`ChromaDB path: ${CHROMA_DB_PATH}`);
+    console.log("CRITICAL: Ensure you have a Persistent Disk mounted at /var/data in your Render settings.");
 }
+
 
 let memoryCollection;
 const app = express();
@@ -99,21 +110,14 @@ client.on('ready', async () => {
     console.log('Client is ready!');
     whatsAppStatus = 'connected'; // Redundant but safe
     
-    console.log("Attempting to connect to vector database with robust method...");
-    // Robustly get or create the collection
+    console.log("Attempting to connect to vector database...");
     try {
-        memoryCollection = await chromaClient.getCollection({ name: "memory" });
-        console.log("Successfully loaded existing memory collection.");
+        memoryCollection = await chromaClient.getOrCreateCollection({ name: "memory" });
+        console.log("Successfully connected to memory collection.");
     } catch (error) {
-        console.warn("Could not get existing collection, attempting to create a new one.");
-        try {
-            memoryCollection = await chromaClient.createCollection({ name: "memory" });
-            console.log("Successfully created new memory collection.");
-        } catch (createError) {
-             console.error("Fatal error: Could not get or create memory collection.", createError);
-             // On Render, we don't want to crash the whole app, just log the error.
-             if (!IS_RENDER_ENV) process.exit(1);
-        }
+         console.error("Fatal error: Could not get or create memory collection.", error);
+         // On Render, we don't want to crash the whole app, just log the error.
+         if (!IS_RENDER_ENV) process.exit(1);
     }
     
     console.log(`Assistant is running on number: ${client.info.wid._serialized}`);
@@ -213,6 +217,32 @@ apiRouter.post('/settings', (req, res) => {
     }
 });
 
+apiRouter.post('/restart', async (req, res) => {
+    console.log('API call received to restart WhatsApp client...');
+    try {
+        whatsAppStatus = 'initializing';
+        qrDataURL = null;
+        res.status(200).json({ message: 'Restart initiated. Monitor UI for status changes.' });
+        
+        // Asynchronously destroy and re-initialize
+        (async () => {
+            try {
+                await client.destroy();
+                console.log('Client destroyed successfully.');
+            } catch (destroyError) {
+                console.error('Error during client destroy, proceeding with initialization anyway:', destroyError);
+            } finally {
+                console.log('Re-initializing client...');
+                client.initialize();
+            }
+        })();
+
+    } catch (error) {
+        console.error('Error initiating client restart:', error);
+        res.status(500).json({ message: 'Failed to initiate restart.' });
+    }
+});
+
 
 // --- SERVE FRONTEND ---
 app.use(express.static(clientDistPath));
@@ -286,7 +316,7 @@ async function saveToMemory(text) {
         });
         console.log(`Saved to memory (ID: ${docId}): "${text}"`);
     } catch (error) {
-        console.error("CRITICAL: Failed to save to ChromaDB. This is likely a library bug.", error);
+        console.error("CRITICAL: Failed to save to ChromaDB.", error);
     }
 }
 
@@ -303,7 +333,7 @@ async function answerQuestion(question) {
             queryTexts: [question],
         });
     } catch (error) {
-        console.error("CRITICAL: ChromaDB query failed. This is a library bug. Falling back to generic response.", error);
+        console.error("CRITICAL: ChromaDB query failed. Falling back to generic response.", error);
         return getGenericChatResponse(`Answer this question: ${question}`);
     }
 
